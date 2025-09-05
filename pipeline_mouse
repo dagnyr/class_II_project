@@ -56,18 +56,6 @@ adata.obs.loc[adata_big.obs_names, "predicted_doublet"] = adata_big.obs["predict
 adata.obs["predicted_doublet"] = adata.obs["predicted_doublet"].astype(str)
 adata.obs["doublet_score"] = adata.obs["doublet_score"].astype(float)
 
-# ------------------------------------ #
-# ---------------------------------------------- #
-# -------------------------------------------------------- #
-# for mouse only -> convert genes w/ homologene
-
-
-# -------------------------------------------------------- #
-# ---------------------------------------------- #
-# ------------------------------------ #
-
-
-
 # -------------------------------------------------------- #
 # varibale feature analysis
 sc.pp.highly_variable_genes(adata, n_top_genes=2000, batch_key="sample")
@@ -132,9 +120,6 @@ marker_genes = {
     "T naive": ["LEF1", "CCR7", "TCF7"],
     "pDC": ["GZMB", "IL3RA", "COBLL1", "TCF4"],
 }
-
-# -------------------------------------------------------- #
-# cell annotation w/ cell typist
 
 # -------------------------------------------------------- #
 # making files

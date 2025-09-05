@@ -18,6 +18,9 @@ adata.var_names_make_unique()
 sc.pp.filter_cells(adata, min_genes=250)  # this does nothing, in this specific case
 sc.pp.filter_genes(adata, min_cells=10)
 # to do - log umi
+adata.obs["log10_genes_per_umi"] = (
+    np.log10(adata.obs["n_genes_by_counts"] + eps) / np.log10(adata.obs["total_counts"] + eps)
+)
 
 # mitochondrial genes, "MT-" for human, "Mt-" for mouse
 adata.var["mt"] = adata.var_names.str.startswith("MT-")
@@ -28,6 +31,13 @@ adata.var["hb"] = adata.var_names.str.contains("^HB[^(P)]")
 
 sc.pp.calculate_qc_metrics(
     adata, qc_vars=["mt", "ribo", "hb"], inplace=True, log1p=True
+)
+
+keep_cells = (
+    (adata.obs["total_counts"] >= 500) &
+    (adata.obs["n_genes_by_counts"] >= 200) &
+    (adata.obs["pct_counts_mt"] <= 10) &                 # %
+    (adata.obs["log10_genes_per_umi"] >= -0.4)           # e.g., ~0.4 genes/UMI in linear space
 )
 
 # -------------------------------------------------------- #
@@ -56,11 +66,19 @@ adata.obs.loc[adata_big.obs_names, "predicted_doublet"] = adata_big.obs["predict
 adata.obs["predicted_doublet"] = adata.obs["predicted_doublet"].astype(str)
 adata.obs["doublet_score"] = adata.obs["doublet_score"].astype(float)
 
+mask_keep = ~(adata.obs["is_doublet"].fillna(False))
+adata = adata[mask_keep].copy()
+
 # ------------------------------------ #
 # ---------------------------------------------- #
 # -------------------------------------------------------- #
 # for mouse only -> convert genes w/ homologene
 
+# extract var names
+
+# convert w/ homologene
+
+# add varnames back removing rows not in the original dataset
 
 # -------------------------------------------------------- #
 # ---------------------------------------------- #
@@ -93,9 +111,24 @@ sc.tl.pca(adata)
 sc.pl.pca_variance_ratio(adata, n_pcs=50, log=True)
 
 # -------------------------------------------------------- #
-# nearest neighbours and umap and clustering
-sc.pp.neighbors(adata)
-sc.tl.leiden(adata, flavor="igraph", n_iterations=2)
+# harmony
+#import scanpy as sc
+import scanpy.external as sce
+import harmonypy
+
+sce.pp.harmony_integrate(
+    bloodspleen,
+    key='biosample_id',          # batch column in adata.obs
+    basis='X_pca',               # input embedding
+    adjusted_basis='X_pca_harmony',  # output will be stored here
+    max_iter_harmony=20,         # iterations
+    theta=2.0                    # batch diversity penalty
+)
+
+sc.pp.neighbors(bloodspleen, use_rep='X_pca_harmony', n_pcs=30)
+sc.tl.umap(bloodspleen)
+sc.tl.louvain(bloodspleen, key_added="louvain", flavor="igraph")
+sc.pl.umap(bloodspleen, color=["biosample_id", "louvain"])
 
 # -------------------------------------------------------- #
 # cell annotation
