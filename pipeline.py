@@ -7,14 +7,14 @@ import matplotlib.pyplot as plt
 # -------------------------------------------------------- #
 # loading files
 spleen1 = sc.read_10x_mtx(
-    "data/filtered_gene_bc_matrices/hg19/",  # the directory with the `.mtx` file
-    var_names="gene_symbols",  # use gene symbols for the variable names (variables-axis index)
-    cache=True,  # write a cache file for faster subsequent reading
+    "dr/cr/pr/class_II_project/in/human/", # directory
+    var_names="gene_symbols", # use symbol genes for homologene and also cell typist
+    cache=True,
 )
 spleen2 = sc.read_10x_mtx(
-    "data/filtered_gene_bc_matrices/hg19/",  # the directory with the `.mtx` file
-    var_names="gene_symbols",  # use gene symbols for the variable names (variables-axis index)
-    cache=True,  # write a cache file for faster subsequent reading
+    "dr/cr/pr/class_II_project/in/mouse/",
+    var_names="gene_symbols",
+    cache=True,
 )
 #spleen = spleen1
 #spleen = spleen2
@@ -86,21 +86,23 @@ spleen.obs["doublet_score"] = spleen.obs["doublet_score"].astype(float)
 mask_keep = ~(spleen.obs["is_doublet"].fillna(False))
 spleen = spleen[mask_keep].copy()
 
-# ------------------------------------ #
+# ---------- MOUSE ONLY BELOW ---------- #
 # ---------------------------------------------- #
 # -------------------------------------------------------- #
-# for mouse only -> convert genes w/ homologene
+# for mouse only -> convert genes w/ homologene using homologene R script.
 
-# extract var names
+map = pd.read_csv("map.csv").dropna(subset=["human"]).set_index("mouse")["human"]
 
-# convert w/ homologene
-
-# add varnames back removing rows not in the original dataset
+actual_genenames = spleen.var_names.isin(map.index)
+spleen_mapped = spleen[:, actual_genenames].copy()
+spleen_mapped.var_names = map.loc[spleen_mapped.var_names].values
+spleen_mapped = spleen_mapped[:, ~spleen_mapped.var_names.duplicated()].copy()
+# TO DO: double check it looks okay
+# spleen = spleen_mapped
 
 # -------------------------------------------------------- #
 # ---------------------------------------------- #
-# ------------------------------------ #
-
+# ---------- MOUSE ONLY ABOVE ---------- #
 
 
 # -------------------------------------------------------- #
@@ -128,7 +130,7 @@ sc.tl.pca(spleen)
 sc.pl.pca_variance_ratio(spleen, n_pcs=50, log=True)
 
 # -------------------------------------------------------- #
-# harmony
+# harmony implementation
 #import scanpy as sc
 import scanpy.external as sce
 import harmonypy
@@ -149,44 +151,11 @@ sc.pl.umap(spleen, color=["biosample_id", "leiden_harmony"])
 #sc.tl.louvain(spleen, key_added="louvain", flavor="igraph")
 #sc.pl.umap(spleen, color=["biosample_id", "louvain"])
 
-# -------------------------------------------------------- #
-# cell annotation
-
-marker_genes = {
-    "CD14+ Mono": ["FCN1", "CD14"],
-    "CD16+ Mono": ["TCF7L2", "FCGR3A", "LYN"],
-    # Note: DMXL2 should be negative
-    "cDC2": ["CST3", "COTL1", "LYZ", "DMXL2", "CLEC10A", "FCER1A"],
-    "Erythroblast": ["MKI67", "HBA1", "HBB"],
-    # Note HBM and GYPA are negative markers
-    "Proerythroblast": ["CDK6", "SYNGR1", "HBM", "GYPA"],
-    "NK": ["GNLY", "NKG7", "CD247", "FCER1G", "TYROBP", "KLRG1", "FCGR3A"],
-    "ILC": ["ID2", "PLCG2", "GNLY", "SYNE1"],
-    "Naive CD20+ B": ["MS4A1", "IL4R", "IGHD", "FCRL1", "IGHM"],
-    # Note IGHD and IGHM are negative markers
-    "B cells": [
-        "MS4A1",
-        "ITGB1",
-        "COL4A4",
-        "PRDM1",
-        "IRF4",
-        "PAX5",
-        "BCL11A",
-        "BLK",
-        "IGHD",
-        "IGHM",
-    ],
-    "Plasma cells": ["MZB1", "HSP90B1", "FNDC3B", "PRDM1", "IGKC", "JCHAIN"],
-    # Note PAX5 is a negative marker
-    "Plasmablast": ["XBP1", "PRDM1", "PAX5"],
-    "CD4+ T": ["CD4", "IL7R", "TRBC2"],
-    "CD8+ T": ["CD8A", "CD8B", "GZMK", "GZMA", "CCL5", "GZMB", "GZMH", "GZMA"],
-    "T naive": ["LEF1", "CCR7", "TCF7"],
-    "pDC": ["GZMB", "IL3RA", "COBLL1", "TCF4"],
-}
 
 # -------------------------------------------------------- #
 # cell annotation w/ cell typist
+
+
 
 # -------------------------------------------------------- #
 # making files
