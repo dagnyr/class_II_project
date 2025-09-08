@@ -6,68 +6,85 @@ import matplotlib.pyplot as plt
 
 # -------------------------------------------------------- #
 # loading files
-adata = sc.read_10x_mtx(
+spleen1 = sc.read_10x_mtx(
     "data/filtered_gene_bc_matrices/hg19/",  # the directory with the `.mtx` file
     var_names="gene_symbols",  # use gene symbols for the variable names (variables-axis index)
     cache=True,  # write a cache file for faster subsequent reading
 )
-adata.var_names_make_unique()
+spleen2 = sc.read_10x_mtx(
+    "data/filtered_gene_bc_matrices/hg19/",  # the directory with the `.mtx` file
+    var_names="gene_symbols",  # use gene symbols for the variable names (variables-axis index)
+    cache=True,  # write a cache file for faster subsequent reading
+)
+#spleen = spleen1
+#spleen = spleen2
+spleen.var_names_make_unique()
+
 
 # -------------------------------------------------------- #
 # quality control
-sc.pp.filter_cells(adata, min_genes=250)  # this does nothing, in this specific case
-sc.pp.filter_genes(adata, min_cells=10)
-# to do - log umi
-adata.obs["log10_genes_per_umi"] = (
-    np.log10(adata.obs["n_genes_by_counts"] + eps) / np.log10(adata.obs["total_counts"] + eps)
-)
+sc.pp.filter_cells(spleen, min_genes=250)
+sc.pp.filter_genes(spleen, min_cells=10)
+
 
 # mitochondrial genes, "MT-" for human, "Mt-" for mouse
-adata.var["mt"] = adata.var_names.str.startswith("MT-")
+spleen.var["mt"] = spleen.var_names.str.startswith("MT-")
+#spleen.var["mt"] = spleen.var_names.str.startswith("Mt-")
 # ribosomal genes
-adata.var["ribo"] = adata.var_names.str.startswith(("RPS", "RPL"))
+spleen.var["ribo"] = spleen.var_names.str.startswith(("RPS", "RPL"))
+#spleen.var["ribo"] = spleen.var_names.str.startswith(("Rps", "Rpl"))
 # hemoglobin genes
-adata.var["hb"] = adata.var_names.str.contains("^HB[^(P)]")
+spleen.var["hb"] = spleen.var_names.str.contains("^HB[^(P)]")
+#spleen.var["hb"] = spleen.var_names.str.contains("^Hb[^(p)]")
 
 sc.pp.calculate_qc_metrics(
-    adata, qc_vars=["mt", "ribo", "hb"], inplace=True, log1p=True
+    spleen, qc_vars=["mt", "ribo", "hb"], inplace=True, log1p=True
 )
 
-keep_cells = (
-    (adata.obs["total_counts"] >= 500) &
-    (adata.obs["n_genes_by_counts"] >= 200) &
-    (adata.obs["pct_counts_mt"] <= 10) &                 # %
-    (adata.obs["log10_genes_per_umi"] >= -0.4)           # e.g., ~0.4 genes/UMI in linear space
+spleen.obs["log10_genes_per_umi"] = (
+    np.log10(spleen.obs["n_genes_by_counts"] + eps) / np.log10(spleen.obs["total_counts"] + eps)
 )
+
+#spleen.obs["log10_genes_per_umi"] = np.log10(spleen.obs["n_genes_by_counts"].clip(lower=1) / spleen.obs["total_counts"].clip(lower=1))
+
+keep_cells = (
+    (spleen.obs["total_counts"] >= 250) &
+    (spleen.obs["n_genes_by_counts"] >= 200) &
+    (spleen.obs["pct_counts_mt"] <= 10) &
+    spleen.obs["log10_genes_per_umi"] >=0.8)
+    )
+)
+
+spleen = spleen[keep_cells].copy()
 
 # -------------------------------------------------------- #
 # doublet detection and removal
-vc = adata.obs["donor_id"].value_counts()
+vc = spleen.obs["donor_id"].value_counts() # TO DO: double check name of donor id variable in metadata
 keep = vc[vc >= 100].index
-adata_big = adata[adata.obs["donor_id"].isin(keep)].copy()
+spleen_big = spleen[spleen.obs["donor_id"].isin(keep)].copy()
 
 # choose a safe PC count globally
-max_pcs = int(min(adata_big.n_obs, adata_big.n_vars) - 1)
+max_pcs = int(min(spleen_big.n_obs, spleen_big.n_vars) - 1)
 npcs = max(1, min(15, max_pcs))
 
 import scanpy as sc
 sc.pp.scrublet(
-    adata_big,
+    spleen_big,
     batch_key="donor_id",
     n_prin_comps=npcs,
     threshold=0.25,
 )
 
-adata.obs["doublet_score"] = np.nan
-adata.obs["predicted_doublet"] = np.nan
-adata.obs.loc[adata_big.obs_names, "doublet_score"] = adata_big.obs["doublet_score"].values
-adata.obs.loc[adata_big.obs_names, "predicted_doublet"] = adata_big.obs["predicted_doublet"].values
+spleen.obs["doublet_score"] = np.nan
+spleen.obs["predicted_doublet"] = np.nan
+spleen.obs.loc[spleen_big.obs_names, "doublet_score"] = spleen_big.obs["doublet_score"].values
+spleen.obs.loc[spleen_big.obs_names, "predicted_doublet"] = spleen_big.obs["predicted_doublet"].values
 
-adata.obs["predicted_doublet"] = adata.obs["predicted_doublet"].astype(str)
-adata.obs["doublet_score"] = adata.obs["doublet_score"].astype(float)
+spleen.obs["predicted_doublet"] = spleen.obs["predicted_doublet"].astype(str)
+spleen.obs["doublet_score"] = spleen.obs["doublet_score"].astype(float)
 
-mask_keep = ~(adata.obs["is_doublet"].fillna(False))
-adata = adata[mask_keep].copy()
+mask_keep = ~(spleen.obs["is_doublet"].fillna(False))
+spleen = spleen[mask_keep].copy()
 
 # ------------------------------------ #
 # ---------------------------------------------- #
@@ -88,15 +105,15 @@ adata = adata[mask_keep].copy()
 
 # -------------------------------------------------------- #
 # varibale feature analysis
-sc.pp.highly_variable_genes(adata, n_top_genes=2000, batch_key="sample")
-sc.pl.highly_variable_genes(adata)
+sc.pp.highly_variable_genes(spleen, n_top_genes=2000, batch_key="sample")
+sc.pl.highly_variable_genes(spleen)
 
 # -------------------------------------------------------- #
 # normalization, logarithimization, etc.
-sc.pp.normalize_total(adata, target_sum=1e4)
-sc.pp.log1p(adata)
+sc.pp.normalize_total(spleen, target_sum=1e4)
+sc.pp.log1p(spleen)
 sc.pp.highly_variable_genes(
-    adata,
+    spleen,
     layer="counts",
     n_top_genes=2000,
     min_mean=0.0125,
@@ -107,8 +124,8 @@ sc.pp.highly_variable_genes(
 
 # -------------------------------------------------------- #
 # scaling and packages
-sc.tl.pca(adata)
-sc.pl.pca_variance_ratio(adata, n_pcs=50, log=True)
+sc.tl.pca(spleen)
+sc.pl.pca_variance_ratio(spleen, n_pcs=50, log=True)
 
 # -------------------------------------------------------- #
 # harmony
@@ -117,18 +134,20 @@ import scanpy.external as sce
 import harmonypy
 
 sce.pp.harmony_integrate(
-    bloodspleen,
-    key='biosample_id',          # batch column in adata.obs
+    spleen,
+    key='biosample_id',          # batch column in spleen.obs
     basis='X_pca',               # input embedding
     adjusted_basis='X_pca_harmony',  # output will be stored here
     max_iter_harmony=20,         # iterations
     theta=2.0                    # batch diversity penalty
 )
 
-sc.pp.neighbors(bloodspleen, use_rep='X_pca_harmony', n_pcs=30)
-sc.tl.umap(bloodspleen)
-sc.tl.louvain(bloodspleen, key_added="louvain", flavor="igraph")
-sc.pl.umap(bloodspleen, color=["biosample_id", "louvain"])
+sc.pp.neighbors(spleen, use_rep='X_pca_harmony', n_pcs=30)
+sc.tl.umap(spleen)
+sc.tl.leiden(spleen, key_added="leiden_harmony", resolution=1.0)
+sc.pl.umap(spleen, color=["biosample_id", "leiden_harmony"])
+#sc.tl.louvain(spleen, key_added="louvain", flavor="igraph")
+#sc.pl.umap(spleen, color=["biosample_id", "louvain"])
 
 # -------------------------------------------------------- #
 # cell annotation
