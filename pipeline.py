@@ -146,8 +146,8 @@ sce.pp.harmony_integrate(
 
 sc.pp.neighbors(spleen, use_rep='X_pca_harmony', n_pcs=30)
 sc.tl.umap(spleen)
-sc.tl.leiden(spleen, key_added="leiden_harmony", resolution=1.0)
-sc.pl.umap(spleen, color=["biosample_id", "leiden_harmony"])
+sc.tl.leiden(spleen, key_added="leiden_clusters", resolution=1.0)
+sc.pl.umap(spleen, color=["biosample_id", "leiden_clusters"])
 #sc.tl.louvain(spleen, key_added="louvain", flavor="igraph")
 #sc.pl.umap(spleen, color=["biosample_id", "louvain"])
 
@@ -158,4 +158,4 @@ sc.pl.umap(spleen, color=["biosample_id", "leiden_harmony"])
 
 
 # -------------------------------------------------------- #
-# making files
+# transfer cell annotation to naive dataset
