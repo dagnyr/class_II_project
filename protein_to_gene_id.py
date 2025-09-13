@@ -5,7 +5,7 @@ def stripver(x): return str(x).split(".", 1)[0]
 def build_prot2gene(id_list):
     mg = mygene.MyGeneInfo()
     ids = [stripver(x) for x in id_list]
-    ids = list(dict.fromkeys(ids))            # unique, keep order
+    ids = list(dict.fromkeys(ids))
     human = [x for x in ids if x.startswith("ENSP")]
     mouse = [x for x in ids if x.startswith("ENSMUSP")]
     m = {}
