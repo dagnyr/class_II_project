@@ -7,21 +7,20 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --partition=normal
 
-# Load BLAST
+# load ncbi blast
 module load biology ncbi-blast+/2.16.0
 
-# Move to working directory
+# move to home directory
 cd $HOME
 
-# Input FASTA files (already downloaded & gunzipped)
+# load fasta (protein)
 HS=Homo_sapiens.GRCh38.pep.all.fa
 MM=Mus_musculus.GRCm39.pep.all.fa
 
-# Make BLAST databases
+# make BLAST databases
 makeblastdb -in $HS -dbtype prot -out hs_db
 makeblastdb -in $MM -dbtype prot -out mm_db
 
-# Run reciprocal BLASTs
+# run reciprocal blast
 blastp -query $HS -db mm_db -out hs_to_mm.txt -evalue 1e-6 -outfmt 6 -num_threads 8
 blastp -query $MM -db hs_db -out mm_to_hs.txt -evalue 1e-6 -outfmt 6 -num_threads 8
-
